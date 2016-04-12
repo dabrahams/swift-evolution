@@ -7,39 +7,51 @@
 
 ## Introduction
 
-This proposal cleans up Swift's integer APIs and makes them more useful for
-generic programming. At the same time it is NOT meant to solve a problem of
-mixed-type arithmetic, which is a much more complicated topic, that we would
-like to address with a different proposal some time in the future.
+This proposal:
+
+* Cleans up Swift's integer protocols, making them useful for
+  generic programming
+* Makes bit-shifting more general and usable
+* Reduces the proliferation of arithmetic operator overloads
+* Eliminates the hard-coded and artificial “maximum-width integer
+  type” `IntMax`.
+* Enables mixed-type comparisons and shifting
+
+The problem of generalized mixed-type arithmetic—a much more
+complicated topic—should be addressed in the future but is an explicit
+*non-goal* of this proposal.
 
 ## Motivation
 
-Various parts of Swift's integer APIs generate confusion. Some more than others.
-See [this blog post](http://blog.krzyzanowskim.com/2015/03/01/swift_madness_of_generic_integer/)
-for an example of an attempt to write an algorithm that is generic on any
-integer.
+Although generalized algorithms and data types that can work for any
+integer are common, Swift's integer protocols were never properly
+designed for that purpose, and have
+[proven frustrating](http://blog.krzyzanowskim.com/2015/03/01/swift_madness_of_generic_integer/)
+to those who have tried.
 
-`Integer` and `Arithmetic` protocols are not of much use, as they define
-all binary operations on pairs of arguments with the same concrete type, thus
-making generic programming impossible at the same slowing down the type checker,
-due to a large number of overloads.
+The `Integer` and `IntegerArithmetic` protocols are not of much use,
+as they define all binary operations on pairs of arguments with the
+same concrete type, thus making generic programming impossible at the
+same slowing down the type checker, due to a large number of
+overloads.
 
 Another annoying problem, that gets mentioned often, is inability to use
 integers of different types in comparison and bit-shift operations. For example,
 the following snippet won't compile:
 
-````Swift
-var x: Int8 = 42
-x << (1 as Int16) // error: binary operator '<<' cannot be applied to operands of type 'Int8' and 'Int16'
-x > (0 as Int)    // error: binary operator '>' cannot be applied to operands of type 'Int8' and 'Int'
-````
+```Swift
+let x: Int8 = 42
+let y = 1
+x << y    // error: binary operator '<<' cannot be applied to operands of type 'Int8' and 'Int'
+x > y     // error: binary operator '>' cannot be applied to operands of type 'Int8' and 'Int'
+```
 
 Moreover, current design predates many of the improvements that came in Swift 2,
 and haven't been revised since then.
 
 Here is the basic layout of integer protocols as of Swift 2:
 
-````
+```
          +---------------------+   +---------------------+
          |  IntegerArithmetic  |   |  BitwiseOperations  |
          +------------------+--+   ++--------------------+
@@ -58,7 +70,7 @@ Here is the basic layout of integer protocols as of Swift 2:
          +-----------------+-+       ++--------+-------+
          |  UnsignedInteger  |       |  SignedInteger  |
          +-------------------+       +-----------------+
-````
+```
 
 ## Proposed solution
 
@@ -107,7 +119,7 @@ implementations, they will be provided by a protocol extension.  Implementation
 in that case will copy `self`, perform a mutating operation on it and return
 the resulting value.
 
-````Swift
+```Swift
 public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
   init()
 
@@ -126,7 +138,7 @@ public protocol Arithmetic : Equatable, IntegerLiteralConvertible {
   mutating func multiply(by rhs: Self)
   mutating func divide(by rhs: Self)
 }
-````
+```
 
 #### `SignedArithmetic` protocol
 
@@ -136,11 +148,11 @@ negate an unsigned value.
 The only method of this protocol has the default implementation in an
 extension, that uses a parameterless initializer and subtraction.
 
-````Swift
+```Swift
 public protocol SignedArithmetic : Arithmetic {
   func negate() -> Self
 }
-````
+```
 
 #### `Integer` protocol
 
@@ -173,7 +185,7 @@ unsigned values, for example, printing a value of an integer (it's just adding a
 Please note, that `absoluteValue` property should not in general be used as a
 substitute for an `abs` free function, that returns a value of the same type.
 
-````Swift
+```Swift
 public protocol Integer:
   Comparable, Arithmetic,
   IntegerLiteralConvertible, CustomStringConvertible {
@@ -233,7 +245,7 @@ public protocol Integer:
   /// into a single instruction by the compiler.
   func quotientAndRemainder(dividingBy rhs: Self) -> (Self, Self)
 }
-````
+```
 
 #### `FixedWidthInteger` protocol
 
@@ -252,7 +264,7 @@ operations: free function dispatches a call to a corresponding protocol method.
 support for integer types of a greater width and as a consequence, arbitrary
 precision integers.
 
-````Swift
+```Swift
 public protocol FixedWidthInteger : Integer {
   static var bitWidth : Int { get }
 
@@ -300,25 +312,25 @@ public protocol FixedWidthInteger : Integer {
 
   init(_truncatingBits bits: UInt)
 }
-````
+```
 
 #### Auxilliary protocols
 
-````Swift
+```Swift
 public protocol UnsignedInteger : Integer {
   associatedtype AbsoluteValue : Integer
 }
 public protocol SignedInteger : Integer, SignedArithmetic {
   associatedtype AbsoluteValue : Integer
 }
-````
+```
 
 
 ### Operators
 
 #### Arithmetic
 
-````Swift
+```Swift
 public func + <T: Arithmetic>(lhs: T, rhs: T) -> T
 public func += <T: Arithmetic>(lhs: inout T, rhs: T)
 public func - <T: Arithmetic>(lhs: T, rhs: T) -> T
@@ -329,7 +341,7 @@ public func / <T: Arithmetic>(lhs: T, rhs: T) -> T
 public func /= <T: Arithmetic>(lhs: inout T, rhs: T)
 public func % <T: Arithmetic>(lhs: T, rhs: T) -> T
 public func %= <T: Arithmetic>(lhs: inout T, rhs: T)
-````
+```
 
 ##### Implementation example
 
@@ -345,11 +357,11 @@ using intrinsics.
 
 #### Masking arithmetics
 
-````Swift
+```Swift
 public func &* <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func &- <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func &+ <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
-````
+```
 
 ##### Implementation
 
@@ -359,28 +371,28 @@ and simply return the `partialValue` part, ignoring the possible overflow.
 
 #### Homogeneous comparison
 
-````Swift
+```Swift
 public func == <T : Integer>(lhs:T, rhs: T) -> Bool
 public func != <T : Integer>(lhs:T, rhs: T) -> Bool
 public func < <T : Integer>(lhs: T, rhs: T) -> Bool
 public func > <T : Integer>(lhs: T, rhs: T) -> Bool
 public func >= <T : Integer>(lhs: T, rhs: T) -> Bool
 public func <= <T : Integer>(lhs: T, rhs: T) -> Bool
-````
+```
 
 Implementation is similar to the homogeneous arithmetic operators above.
 
 
 #### Heterogeneous comparison
 
-````Swift
+```Swift
 public func == <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool
 public func != <T : Integer, U : Integer>(lhs:T, rhs: U) -> Bool
 public func < <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool
 public func > <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool
 public func >= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool
   public func <= <T : Integer, U : Integer>(lhs: T, rhs: U) -> Bool
-````
+```
 
 ##### Implementation example
 
@@ -395,7 +407,7 @@ type using runtime intrinsics.
 
 #### Shifts
 
-````Swift
+```Swift
 public func << <T: FixedWidthInteger, U: Integer>(lhs: T, rhs: U) -> T
 public func << <T: FixedWidthInteger>(lhs: T, rhs: Word) -> T
 public func <<= <T: FixedWidthInteger, U: Integer>(lhs: inout T, rhs: U)
@@ -415,7 +427,7 @@ public func &>> <T: FixedWidthInteger, U: Integer>(lhs: T, rhs: U) -> T
 public func &>> <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func &>>= <T: FixedWidthInteger, U: Integer>(lhs: inout T, rhs: U)
 public func &>>= <T: FixedWidthInteger>(lhs: inout T, rhs: T)
-````
+```
 
 ##### Implementation example (mixed-type left shift)
 
@@ -430,14 +442,14 @@ implemented efficiently on a concrete type.
 
 #### Bitwise operations
 
-````Swift
+```Swift
 public func | <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func |= <T: FixedWidthInteger>(lhs: inout T, rhs: T)
 public func & <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func &= <T: FixedWidthInteger>(lhs: inout T, rhs: T)
 public func ^ <T: FixedWidthInteger>(lhs: T, rhs: T) -> T
 public func ^= <T: FixedWidthInteger>(lhs: inout T, rhs: T)
-````
+```
 
 
 ## Impact on existing code
