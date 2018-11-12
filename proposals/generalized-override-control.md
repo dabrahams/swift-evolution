@@ -9,11 +9,11 @@ We propose:
 - a way to prevent the unintentional creation of (notional) overload sets that
   include functions inherited from protocols and base classes.
 - a way to diagnose unintentional failure to implement a protocol requirement.
-- a way to disambiguate references to or calls of identically-named functions.
+- a way to disambiguate identically-named functions.
 
 ## Motivation
 
-This proposal solves three problems:
+This proposal solves four problems:
 
 1. It's very common to intentionally define a same-named method with a more
    specific signature than one inherited from a protocol:
@@ -125,8 +125,14 @@ This proposal solves three problems:
     let a = X()
     print(a.f()) // error: ambiguous use of 'f'
     ```
-    
+
+4. When two protocols, or a protocol and a class, define customization points
+   with identical signatures, there's no way to specify which one is being
+   implemented by a model or subclass.
+
 ## Solution
+
+* We extend member qualification syntax to
 
 * We introduce two new annotations in the family with `override`: `new` and
   `new(overload)` to indicate a new, distinct method that either hides or
