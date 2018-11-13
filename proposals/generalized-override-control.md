@@ -9,7 +9,7 @@ We propose:
 - a way to prevent the unintentional creation of (notional) overload sets that
   include functions inherited from protocols and base classes.
 - a way to diagnose unintentional failure to implement a protocol requirement.
-- a way to disambiguate identically-named functions.
+- a way to disambiguate uses of identically-named functions.
 
 ## Motivation
 
@@ -132,42 +132,82 @@ This proposal solves four problems:
 
 ## Solution
 
-* We extend member qualification syntax to
-
-* We introduce two new annotations in the family with `override`: `new` and
-  `new(overload)` to indicate a new, distinct method that either hides or
-  overloads another with the same base name, respectively.
-
-* A diagnostic will be emitted when an un-annotated method's base name (not
-  including argument labels) matches that of a method defined in a less-specific
-  or remote context.  This includes `subscript` but excludes `init` and
-  `deinit`:
+* We extend name syntax to allow the specification of a module in which to look
+  for an extension.  Specifically, if module `A` declares the following extension:
   
-    **Module A**
+  ```swift
+  extension X.Y {
+      public var f() -> Int { return 0 }
+  }
+  ```
+  
+  the method it declares can be referred to from any module as `A::X.Y.f`.
+  
+* We extend the `override` keyword:
+    - it will be allowed on implementations of protocol requirements (probably
+      except for associated types, at least initially).
+    - it will accept an optional argument that names a class or protocol having
+      the customization point being overridden.
+  
+    ```swift
+    protocol P1 { func f() }
+    protocol P2 { func f() }
+    class Base { func f() }
+    
+    struct Model : P1, P2 {
+        override(P1) func f() {} // implements P1's f()
+        override(P2) func f() {} // implements P2's f()
+    }
+    
+    class Derived : Base, P1 {
+        override(Base) func f() {} // Implements Base's f()
+        override(P1) func f() {}   // Implements P1's f()
+    }
+    ```
+    
+* We introduce two new annotations, in a syntactic family with `override`: 
+    - `new` indicates a distinct method that *hides* methods, declared in
+      less-specific contexts, that have the **same base name.**  Note: there is
+      precedent in C# for using `new` this way.
+    - `new(overload)` indicates a distinct method that *overloads* methods,
+      declared in less-specific contexts, that have the **same base name.**
+
+* We make it an error to declare an un-annotated method's base name matches that
+  of a method defined in a less-specific or remote context.  This includes
+  `subscript` but excludes `init` and `deinit`.  In the code that follows, all
+  instances of `override` and `new` would be required.
+  
     ```swift
     protocol P {
-        func requirement()
         func defaultedRequirement()
         subscript(_: Int) -> Int
     }
     
+    // A protocol extension in the module where the protocol is declared
+    // has same specificity as the protocol does.
     extension P {
-        func defaultedRequirement() {} // OK, same specificity as protocol
+        // This declaration implements (a.k.a. overrides) P's requirement.
+        func defaultedRequirement() {}
+        
+        // No base name match; this declaration introduces a new function.
         func extension() {}
-        subscript(_: String) -> String // OK, same specificity as protocol
+        
+        // This declaration *overloads* the subscript declared in P.  There's no
+        // way to hide a P requirement in an extension of P.
+        subscript(_: String) -> String
     }
     
     struct X : P {
-        func requirement() {}                        // Diagnostic: annotate 
-        func defaultedRequirement(label: Int = 0) {} // Diagnostic: annotate 
-    }
-    ```
-    
-    **Module B**
-    ```swift
-    import A
-    extension X {
-        func requirement() -> Int? { return nil }   // Diagnostic: annotate
+        // This definition implements P's requirement.
+        override subscript(x: Int) -> Int { return x }
+        
+        // This declaration makes hides P's requirement of the same base name
+        // from access on an instance of static type X.
+        new func defaultedRequirement(label: Int = 0) {}
+        
+        // This declaration adds an overload to the set of subscripts visible
+        // to code handling an instance of static type X.
+        new(overload) subscript(x: Double) -> Double { return x }
     }
     ```
     
@@ -181,6 +221,25 @@ This proposal solves four problems:
 
 ## Open Questions
 
-* Can we ever make this diagnostic an error?
 * Can we order extensions based on specificity of constraints?
+* Shall we loosen the annotation requirements for requirements in conformance
+  declarations?  For example:
+  
+    ```swift
+    extension X : P {
+        func requirement() {}
+    }
+    ```
 
+    It could reasonably be assumed that, if `P` has a `requirement` requirement,
+    that the method above is intended to override it.  If we do assume that,
+    what are the rules?  Suppose the extension declares conformance to two
+    protocols?  Can we make the same assumption in the main declaration
+    of `X`, outside an extension?
+* Is there any reason to require annotation on matches in protocol extensions?
+
+## Possible Future directions
+
+* Allow an `override` to add parameters, as long as they have defaulted argument
+  values, have contravariant argument and/or covariant return types.
+* Allow/require `override` annotations on associated types.
