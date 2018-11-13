@@ -1,4 +1,4 @@
-# Pitch: Generalizing Override Control for Swift 6
+# Pitch: Generalizing Override Control
 
 **Authors:** Dave Abrahams (@dabrahams) and Doug Gregor (@dgregor)
 
@@ -48,7 +48,7 @@ This proposal solves four problems:
     and the intentionally-overloaded algorithms defined on `LazyCollection`.
     The latest example of a problem caused by failure to control this kind of
     overload has been
-    [cited](https://forums.swift.org/t/se-0231-optional-iteration-wrapup/16981/7?u=dabrahams)
+    [cited](https://forums.swift.org/t/se-0231-optional-iteration/16737/298?u=dabrahams)
     as the source of performance and correctness traps.
     
 2. It's very common to write a method with the intention of implementing a
@@ -221,22 +221,27 @@ This proposal solves four problems:
 
 ## Open Questions
 
-* Can we order extensions based on specificity of constraints?
+* Can (and should) we order protocol and generic type extensions based on
+  specificity of constraints?
 * Shall we loosen the annotation requirements for requirements in conformance
   declarations?  For example:
   
     ```swift
+    protocol P {
+        func requirement()
+    }
+    
     extension X : P {
         func requirement() {}
     }
     ```
 
     It could reasonably be assumed that, if `P` has a `requirement` requirement,
-    that the method above is intended to override it.  If we do assume that,
-    what are the rules?  Suppose the extension declares conformance to two
-    protocols?  Can we make the same assumption in the main declaration
-    of `X`, outside an extension?
-* Is there any reason to require annotation on matches in protocol extensions?
+    and the extension declares conformance to `P`, that the method above is
+    intended to override it.  If we do assume that, what are the rules?  Suppose
+    the extension declares conformance to two protocols?  Can we make the same
+    assumption in the main declaration of `X`, outside an extension?
+* What is the migration story for existing code?
 
 ## Possible Future directions
 
