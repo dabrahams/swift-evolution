@@ -25,20 +25,15 @@ struct Clamped<Bound: Comparable> {
     to range: ClosedRange<Bound>
   ) { ... }
   
-  
   var wrappedValue: Bound { 
     get { ... }
     set { ... }
   }
-  
 }
 
-
 struct Percentage {
-
   @Clamped(to: 0 ... 100)
   var percent = 0
-     
      
   mutating func increment() {
     percent += 1
@@ -62,7 +57,6 @@ struct Percentage {
     //               ^~~~~~~~~~~~~
     // We must access 'wrappedValue' manually.
   }
-  
 }
 ```
 
@@ -72,14 +66,11 @@ This limitation in expressivity is emphasized by the fact that property wrappers
 
 ```swift
 extension Percentage {
-
   func modify(
     inSeconds seconds: Int,
     block: @escaping (inout Clamped<Int>) -> Void
   ) { ... }
-  
 }
-
 
 let myPercentage = Percentage(percent: 50)
 
@@ -96,21 +87,16 @@ In fact, establishing custom behavior on closure parameters is really powerful. 
 
 ```swift
 struct MyView: View {
-
   // A simple Shopping Item that includes
   // a 'quantity' and a 'name' property.
   @State 
   private var shoppingItems: [Item]
 
-
   var body: some View {
     ForEach(0 ..< shoppingItems.count) { index in
-  
       TextField("Enter the item's name...", $shoppingItems[index].name)
-      
     }
   }
-  
 }
 ```
 
@@ -118,10 +104,8 @@ we would — with an appropriate initializer — be able to simplify the above c
 
 ```swift
 struct MyView: View {
-
   @State 
   private var shoppingItems: [Item]
-
 
   var body: some View {
     ForEach($shoppingItems) { @Binding shoppingItem in
@@ -130,7 +114,6 @@ struct MyView: View {
       
     }
   }
-  
 }
 ```
 
@@ -166,21 +149,15 @@ Transformation of property-wrapper parameters will be performed as such:
 ```swift
 @propertyWrapper
 struct Lowercased {
-
   init(wrappedValue: String) { ... }
-    
     
   var wrappedValue: String {
     get { ... }
     set { ... }
   }
-  
 }
 
-func postUrl(
-  @Lowercased urlString: String
-) { ... }
-
+func postUrl(@Lowercased urlString: String) { ... }
 
 postUrl(urlString: "mySite.xyz/myUnformattedUsErNAme")
 ```
